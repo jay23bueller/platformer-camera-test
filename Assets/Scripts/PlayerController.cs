@@ -163,7 +163,6 @@ public class PlayerController : MonoBehaviour
 
 
             _previousInput = _currentInput;
-            _justTransitioned = true;
 
 
             newCam = GameObject.Find(other.GetComponent<TriggerInfo>().CameraOne).GetComponent<CinemachineVirtualCamera>();
@@ -179,12 +178,20 @@ public class PlayerController : MonoBehaviour
             }
             else
             {
-                transform.forward = transform.rotation * _previousInput;
+                if(!_justTransitioned)
+               
+                    transform.forward = transform.rotation * _previousInput;
+                
+               
       
-                Debug.DrawLine(transform.position, transform.position + (transform.forward * 5f), Color.blue, 5f);
                 _isStrafing = false;
             }
 
+
+            _justTransitioned = true;
+
+
+            Debug.DrawLine(transform.position, transform.position + (transform.forward * 5f), Color.blue, 5f);
 
             newCam.Priority = 10;
             _currentCam.Priority = 0;
