@@ -21,6 +21,7 @@ public class PlayerController : MonoBehaviour
     private Vector3 _currentInput;
     private Quaternion _previousRotation;
 
+    private bool _startingTransition;
 
     private bool _isStrafing = false;
 
@@ -30,7 +31,7 @@ public class PlayerController : MonoBehaviour
     private TMP_Text _inputText;
     [SerializeField]
     private TMP_Text _keyText;
-    
+
 
     private void Awake()
     {
@@ -46,7 +47,7 @@ public class PlayerController : MonoBehaviour
 
     private void UpdateKeyText()
     {
-        StringBuilder stringBuilder= new StringBuilder();
+        StringBuilder stringBuilder = new StringBuilder();
         if (Input.GetKey(KeyCode.W))
         {
             stringBuilder.Append(" W ");
@@ -66,7 +67,7 @@ public class PlayerController : MonoBehaviour
 
         //_keyText.text = stringBuilder.ToString();
 
-        _keyText.text = ""+ new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
+        _keyText.text = "" + new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
     }
 
     private void Update()
@@ -74,8 +75,8 @@ public class PlayerController : MonoBehaviour
 
         UpdateKeyText();
         Vector3 inputVec = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
-        
-        if(inputVec.sqrMagnitude != 0)
+
+        if (inputVec.sqrMagnitude != 0 && !_startingTransition)
         {
             inputVec.Normalize();
             _currentInput = inputVec;
@@ -83,31 +84,39 @@ public class PlayerController : MonoBehaviour
 
             if (_justTransitioned)
             {
-                if(Vector3.Dot(_previousInput, _currentInput) < .88f)
+                if (Vector3.Dot(_previousInput, _currentInput) < .88f)
                 {
+                    Debug.Log("Previous: " + _previousInput + " New Transformed: " + transform.rotation * _currentInput);
                     inputVec = Vector3.zero;
                     _justTransitioned = false;
                 }
                 else
                 {
 
-                    if ((_currentCam.GetCinemachineComponent<CinemachinePOV>() != null))
+                    if (_currentCam.GetCinemachineComponent<CinemachinePOV>() == null)
                     {
-                        CinemachinePOV cinemachinePOV = _currentCam.GetCinemachineComponent<CinemachinePOV>();
-                        inputVec = Quaternion.Euler(0f, cinemachinePOV.m_HorizontalAxis.Value, 0f) * Vector3.forward;
-                        transform.rotation = Quaternion.Euler(0f, cinemachinePOV.m_HorizontalAxis.Value, 0f);
+
+                        inputVec = transform.forward;
+                        Debug.Log("Applying Vec");
+
                     }
                     else
                     {
-                       
-                        transform.rotation = Quaternion.Euler(0f,_previousRotation.eulerAngles.y, 0f);
-                        inputVec = transform.rotation * transform.forward;
-                    }
-                    
-                }
 
-                
+                        CinemachinePOV cinemachinePOV = _currentCam.GetCinemachineComponent<CinemachinePOV>();
+                        inputVec = Quaternion.Euler(0f, cinemachinePOV.m_HorizontalAxis.Value, 0f) * Vector3.forward;
+                        transform.rotation = Quaternion.Euler(0f, cinemachinePOV.m_HorizontalAxis.Value, 0f);
+                        Debug.Log("Applying POV");
+
+                    }
+                }
             }
+
+
+
+
+
+
 
 
             if (!_justTransitioned && inputVec.sqrMagnitude != 0f)
@@ -126,14 +135,14 @@ public class PlayerController : MonoBehaviour
                 }
             }
 
-            _inputText.text = ""+inputVec;
-            
+            _inputText.text = "" + inputVec;
+
         }
 
-        if ((_currentCam.GetCinemachineComponent<CinemachinePOV>() != null))
+        if ((_currentCam.GetCinemachineComponent<CinemachinePOV>() != null) && !_startingTransition)
         {
             CinemachinePOV cinemachinePOV = _currentCam.GetCinemachineComponent<CinemachinePOV>();
-           
+
             transform.rotation = Quaternion.Euler(0f, cinemachinePOV.m_HorizontalAxis.Value, 0f);
         }
 
@@ -144,22 +153,18 @@ public class PlayerController : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if(other.TryGetComponent<TriggerInfo>(out TriggerInfo info) && info.CameraOne != _currentCam.name)
+        _startingTransition = true;
+
+        if (other.TryGetComponent<TriggerInfo>(out TriggerInfo info) && info.CameraOne != _currentCam.name)
         {
             CinemachineVirtualCamera newCam = null;
-            
 
 
-                _previousRotation = Quaternion.AngleAxis(Camera.main.transform.rotation.eulerAngles.y, Vector3.up);
-
-         
-                _previousInput = _currentInput;
-                _justTransitioned = true;
 
 
-            
+            _previousInput = _currentInput;
+            _justTransitioned = true;
 
-            
 
             newCam = GameObject.Find(other.GetComponent<TriggerInfo>().CameraOne).GetComponent<CinemachineVirtualCamera>();
 
@@ -169,15 +174,17 @@ public class PlayerController : MonoBehaviour
                 CinemachinePOV currentPOV = newCam.GetCinemachineComponent<CinemachinePOV>();
                 currentPOV.m_VerticalAxis.Value = transform.rotation.eulerAngles.x;
                 currentPOV.m_HorizontalAxis.Value = transform.rotation.eulerAngles.y;
-                
+
                 _isStrafing = true;
-            }   
+            }
             else
             {
-                transform.forward = Quaternion.AngleAxis(Camera.main.transform.rotation.eulerAngles.y, Vector3.up) * Vector3.forward; 
+                transform.forward = transform.rotation * _previousInput;
+      
+                Debug.DrawLine(transform.position, transform.position + (transform.forward * 5f), Color.blue, 5f);
                 _isStrafing = false;
             }
-               
+
 
             newCam.Priority = 10;
             _currentCam.Priority = 0;
@@ -186,6 +193,7 @@ public class PlayerController : MonoBehaviour
             _cameraText.text = _currentCam.name;
         }
 
+        _startingTransition = false;
 
     }
 }
